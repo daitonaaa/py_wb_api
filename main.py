@@ -1,11 +1,14 @@
 import requests as rq
 import json
 import re
-import sys
 import pandas as pd
+from pandas.tseries.offsets import Day
 
-CATEGORY_URL = '/catalog/zhenshchinam/odezhda/dzhinsy-dzhegginsy'
-START_DATE = '2023-08-07'
+CATEGORY_URLS = [
+    '/catalog/zhenshchinam/odezhda/dzhinsy-dzhegginsy',
+    '/catalog/zootovary/dlya-loshadey'
+]
+START_DATE = '2023-07-31'
 END_DATE = '2023-08-13'
 
 # don't touch this
@@ -71,7 +74,7 @@ def get_category_by_path(path):
     return None
 
 
-def get_product_page(path, date, start, end):
+def get_product_page(path, dates_dict, start, end):
     json_data = {}
     json_data['endRow'] = end
     json_data['startRow'] = start
@@ -82,55 +85,75 @@ def get_product_page(path, date, start, end):
         json=json_data,
         params={
             'path': path,
-            'd1': date,
-            'd2': date,
+            'd1': dates_dict['start'],
+            'd2': dates_dict['end'],
         }
     )
     return response
 
 
-def get_products_by_category_path(path, date):
+def get_products_by_category_path(path, dates_dict):
     batch_size = 5000
     data = []
-    print(f'Get products by path {path}, date: {date}')
-    first_response = get_product_page(path, date, len(data), batch_size)
+    print(f'Get products by path {path}, dates: {dates_dict}')
+    first_response = get_product_page(path, dates_dict, len(data), batch_size)
 
     total = first_response['total']
-    print(f'Total products: {total}, date: {date}')
+    print(f'Total products: {total}, dates: {dates_dict}')
     data = data + first_response['data']
 
     while total > len(data):
         start = len(data)
         end = len(data) + batch_size
-        print(f'Waiting product next chunk, start: {start}, end: {end}, date: {date}')
-        product = get_product_page(path, date, start, end)
+        print(f'Waiting product next chunk, start: {start}, end: {end}, dates: {dates_dict}')
+        product = get_product_page(path, dates_dict, start, end)
         data = data + product['data']
 
-    print(f'Products successfully received, data count: {len(data)}, date: {date}')
+    print(f'Products successfully received, data count: {len(data)}, dates: {dates_dict}')
 
     return data
 
 
 if __name__ == '__main__':
-    category = get_category_by_path(CATEGORY_URL)
-    if category is None:
-        print(f'Category by url: {CATEGORY_URL} not found')
-        sys.exit(1)
-
-    products_by_date = {}
-
-    dates_range = pd.date_range(start=START_DATE, end=END_DATE)
-    print(f'Dates: {dates_range}')
-    for date in dates_range:
-        formatted_date = date.strftime('%Y-%m-%d')
-        products_by_date[formatted_date] = get_products_by_category_path(category['path'], formatted_date)
-
+    results = {}
     data_frame = {}
-    for date in products_by_date:
-        data_frame[date] = reduce(lambda acc, cur: acc + cur['revenue'], products_by_date[date], 0)
+
+    for category_url in CATEGORY_URLS:
+        category = get_category_by_path(category_url)
+        if category is None:
+            print(f'Category by url: {category_url} not found')
+            continue
+
+        products_by_date = {}
+
+        dates_range = pd.date_range(start=START_DATE, end=END_DATE, freq='W-MON')
+        print(f'Dates: {dates_range}')
+        for start_date in dates_range:
+            end_date = start_date + Day(6)
+            dates = {
+                'start': start_date.strftime('%Y-%m-%d'),
+                'end': end_date.strftime('%Y-%m-%d')
+            }
+            print(dates)
+            dates_key = f'{dates["start"]}/{dates["end"]}'
+            data_frame[dates_key] = []
+            products_by_date[dates_key] = get_products_by_category_path(
+                category['path'], dates)
+
+        results[category['path']] = products_by_date
+
+    unique_categories = []
+
+    for result_item in results:
+        unique_categories.append(result_item)
+
+    for date_key in data_frame:
+        for result_item in results:
+            data_frame[date_key].append(
+                reduce(lambda acc, cur: acc + cur['revenue'], results[result_item][date_key], 0))
 
     df = pd.DataFrame.from_dict({
-        'Category': [category['path']],
+        'Category': unique_categories,
         **data_frame
     }).set_index('Category')
 
@@ -138,3 +161,4 @@ if __name__ == '__main__':
     print(df)
 
     df.to_excel('results.xlsx')
+

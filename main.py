@@ -2,14 +2,19 @@ import requests as rq
 import json
 import re
 import pandas as pd
-from pandas.tseries.offsets import Day
+from pandas.tseries.offsets import Day, MonthEnd
 
 CATEGORY_URLS = [
     '/catalog/zhenshchinam/odezhda/dzhinsy-dzhegginsy',
     '/catalog/zootovary/dlya-loshadey'
 ]
-START_DATE = '2023-07-31'
-END_DATE = '2023-08-13'
+START_DATE = '2023-06-01'
+END_DATE = '2023-08-31'
+
+FREQ = 'm'
+# FREQ = 'w'
+
+# todo add freq by day
 
 # don't touch this
 WB_API_TOKEN = '64d4cb0f3e13e5.048170039dcc9d3bc2b4f5ef8ea45510cb33335c'
@@ -114,6 +119,18 @@ def get_products_by_category_path(path, dates_dict):
     return data
 
 
+def get_dates_range():
+    result = []
+    freq = 'MS' if FREQ == 'm' else 'W-MON'
+    start_dates = pd.date_range(start=START_DATE, end=END_DATE, freq=freq)
+    for st in start_dates:
+        result.append({
+            'start': st,
+            'end': st + (MonthEnd(1) if FREQ == 'm' else Day(6)),
+        })
+    return result
+
+
 if __name__ == '__main__':
     results = {}
     data_frame = {}
@@ -126,13 +143,12 @@ if __name__ == '__main__':
 
         products_by_date = {}
 
-        dates_range = pd.date_range(start=START_DATE, end=END_DATE, freq='W-MON')
+        dates_range = get_dates_range()
         print(f'Dates: {dates_range}')
-        for start_date in dates_range:
-            end_date = start_date + Day(6)
+        for range_dict in dates_range:
             dates = {
-                'start': start_date.strftime('%Y-%m-%d'),
-                'end': end_date.strftime('%Y-%m-%d')
+                'start': range_dict['start'].strftime('%Y-%m-%d'),
+                'end': range_dict['end'].strftime('%Y-%m-%d')
             }
             print(dates)
             dates_key = f'{dates["start"]}/{dates["end"]}'

@@ -172,20 +172,31 @@ if __name__ == '__main__':
 
         results[category['path']] = products_by_date
 
-    unique_categories = []
-
+    arr_to_render = []
     for result_item in results:
-        unique_categories.append(result_item)
+        row = {
+            'category': result_item,
+        }
+        for date_key in data_frame:
+            row[f'revenue {date_key}'] = reduce(lambda acc, cur: acc + cur['revenue'], results[result_item][date_key], 0)
+            row[f'sales {date_key}'] = reduce(lambda acc, cur: acc + cur['sales'], results[result_item][date_key], 0)
+        arr_to_render.append(row)
 
-    for date_key in data_frame:
-        for result_item in results:
-            data_frame[date_key].append(
-                reduce(lambda acc, cur: acc + cur['revenue'], results[result_item][date_key], 0))
+    # sort columns
+    col_data = []
+    col_sales = []
+    col_revenue = []
+    for col in arr_to_render[0].keys():
+        if r"revenue 2" in col:
+            col_revenue.append(col)
+        elif r"sales 2" in col:
+            col_sales.append(col)
+        else:
+            col_data.append(col)
 
-    df = pd.DataFrame.from_dict({
-        'Category': unique_categories,
-        **data_frame
-    }).set_index('Category')
+    columns = col_data + col_sales + col_revenue
+
+    df = pd.DataFrame.from_records(arr_to_render, index='category', columns=columns)
 
     print('Data frame ready')
     print(df)

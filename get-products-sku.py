@@ -6,9 +6,10 @@ from pandas.tseries.offsets import Day, MonthEnd, Hour, Minute, Second
 
 CATEGORY_URLS = [
     # '/catalog/zhenshchinam/odezhda/dzhinsy-dzhegginsy',
-    '/catalog/zootovary/dlya-loshadey'
+    '/catalog/zootovary/dlya-loshadey',
+    '/promotions/klientskie-dni/dlya-doma/predmety-interera/dekorativnye-nakleyki'
 ]
-START_DATE = '2023-08-29'
+START_DATE = '2023-08-25'
 END_DATE = '2023-08-31'
 
 # FREQ = 'm'
@@ -170,15 +171,41 @@ if __name__ == '__main__':
 
         results[category['path']] = products_by_date
 
-    arr_to_render = []
+    results_map = {}
+
     for result_item in results:
-        row = {
-            'category': result_item,
-        }
+        if not hasattr(results_map, result_item):
+            results_map[result_item] = {}
         for date_key in data_frame:
-            row[f'revenue {date_key}'] = reduce(lambda acc, cur: acc + cur['revenue'], results[result_item][date_key], 0)
-            row[f'sales {date_key}'] = reduce(lambda acc, cur: acc + cur['sales'], results[result_item][date_key], 0)
-        arr_to_render.append(row)
+            for item in results[result_item][date_key]:
+                object_id = str(item['id'])
+
+                try:
+                    results_map[result_item][object_id]
+                except KeyError:
+                    results_map[result_item][object_id] = {
+                        'data': item,
+                        'periods': {}
+                    }
+
+                results_map[result_item][object_id]['periods'][date_key] = {
+                    'revenue': item['revenue'],
+                    'sales': item['sales'],
+                }
+
+    arr_to_render = []
+
+    for cat in results_map:
+        for object_id in results_map[cat]:
+            row = results_map[cat][object_id]['data']
+            row['category'] = cat
+            for period in data_frame.keys():
+                try:
+                    row[f'sales {period}'] = results_map[cat][object_id]['periods'][period]['sales']
+                    row[f'revenue {period}'] = results_map[cat][object_id]['periods'][period]['revenue']
+                except:
+                    pass
+            arr_to_render.append(row)
 
     # sort columns
     col_data = []
@@ -196,7 +223,6 @@ if __name__ == '__main__':
 
     df = pd.DataFrame.from_records(arr_to_render, index='category', columns=columns)
 
-    print('Data frame ready')
     print(df)
 
     df.to_excel('results.xlsx')

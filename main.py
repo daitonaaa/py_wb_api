@@ -40,8 +40,6 @@ def get_dates_range():
     return result
 
 
-# todo add freq by day
-
 # don't touch this
 WB_API_TOKEN = '64d4cb0f3e13e5.048170039dcc9d3bc2b4f5ef8ea45510cb33335c'
 WB_API_BASE_URL = 'https://mpstats.io/api/wb/'

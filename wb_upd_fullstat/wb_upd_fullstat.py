@@ -1,22 +1,25 @@
-import pandas
 import requests as rq
 import pandas as pd
 from pandas.tseries.offsets import Hour, Minute, Second, Day
 import time
 from urllib.parse import quote
 import datetime
+import traceback
+
 
 DATE_STR_FORMAT = '%Y-%m-%d'
 
 prev_day = datetime.datetime.now() - Day(1)
 
-# START_DATE = prev_day.strftime(DATE_STR_FORMAT)
-# END_DATE = prev_day.strftime(DATE_STR_FORMAT)
-START_DATE = '2023-12-06'
-END_DATE = '2023-12-08'
+START_DATE = prev_day.strftime(DATE_STR_FORMAT)
+END_DATE = prev_day.strftime(DATE_STR_FORMAT)
 BASE_URL = 'https://advert-api.wb.ru/adv/v1/'
-# RETRAEFIC_WEBHOOK_SAVE = 'https://retrafic.ru/api/integrations/save/dac1ae569f1fb74bf39b3e85c2097b96'
-RETRAEFIC_WEBHOOK_SAVE = 'https://retrafic.ru/api/integrations/save/feee29adc3d3d63215705a76e7cc7d92'
+RETRAEFIC_WEBHOOK_SAVE = 'https://retrafic.ru/api/integrations/save/dac1ae569f1fb74bf39b3e85c2097b96'
+
+## -------- TEST DATA
+# START_DATE = '2023-12-31'
+# END_DATE = '2023-12-31'
+# RETRAEFIC_WEBHOOK_SAVE = 'https://retrafic.ru/api/integrations/save/feee29adc3d3d63215705a76e7cc7d92'
 
 COMPANIES = [
     {
@@ -34,11 +37,25 @@ COMPANIES = [
     {
         'name': 'Чайковский',
         'authToken': 'eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjMxMDI1djEiLCJ0eXAiOiJKV1QifQ.eyJlbnQiOjEsImV4cCI6MTcxNzgxNzQ2NiwiaWQiOiI5ZjM3NDFjMC0xZThlLTRlMmYtOWNlMC1iYjBjNzY5NWE5ZTciLCJpaWQiOjg2NTQ4NDcsIm9pZCI6OTkzODUwLCJzIjo1MTAsInNpZCI6IjMyZmQ2ZTE0LWE0NGUtNDIxOC1hYzAzLTliNGJlNmU0YjExOSIsInVpZCI6ODY1NDg0N30.APt3UFIYvSJW5pkhW_hnqlRSB81z19_3RRDhA9T57Ppg1VSZFy0sXnTtSFs4mGcCdOmBlWbKOCsTtjRgRWGqmA'
+    },
+    {
+        'name': 'Малец',
+        'authToken': 'eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjMxMDI1djEiLCJ0eXAiOiJKV1QifQ.eyJlbnQiOjEsImV4cCI6MTcxODIyNDIyMCwiaWQiOiIwNGNhN2VjMS1jOGI4LTQ1OTUtODc4Ny1kMDRiNDMyODY1M2IiLCJpaWQiOjExMDM3NTAxNCwib2lkIjoxMjY1Njg0LCJzIjo1MTAsInNhbmRib3giOmZhbHNlLCJzaWQiOiJmMGNkYmQ0Yi1mOTg3LTQ4ZjYtOWYyNy02ZTg3ZjVhZGNhZjIiLCJ1aWQiOjExMDM3NTAxNH0.lF-yRiL1eal2FCjvrAHQiwMP-iZqRMhw6pHXD4liGJxZTDksbPg4O9tFfZW7Npkz71qrylzFxyFdvg1oum_e8w'
+    },
+    {
+        'name': 'Чайковская',
+        'authToken': 'eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjMxMDI1djEiLCJ0eXAiOiJKV1QifQ.eyJlbnQiOjEsImV4cCI6MTcxODIyNDM2OSwiaWQiOiJhNmQ0NDllOC01NTNmLTRhMmYtYjUzZC0zZmYyNzYyMTI0ODMiLCJpaWQiOjEwOTkxNzU5Miwib2lkIjoxMjM2MjQzLCJzIjo1MTAsInNhbmRib3giOmZhbHNlLCJzaWQiOiI1YzFlM2QzZS04MWI5LTRlNzEtYTJhZS0zYTc1ZGViMDZjNDkiLCJ1aWQiOjEwOTkxNzU5Mn0.Thk3SuT5WVyufRo7PQ91vaWWdDz8UmigQONptWiMu4-mLadYBW5ikopadW88riW9ieYZDhIDd_ACOgCGUfYr7A'
+    },
+    {
+        'name': 'Пашкович',
+        'authToken': 'eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjMxMDI1djEiLCJ0eXAiOiJKV1QifQ.eyJlbnQiOjEsImV4cCI6MTcxNzEwOTI3MSwiaWQiOiJjNTQwMDdmNC1lMjlkLTQzNGUtYTcyZC1mMmUzMTIzMjczMzUiLCJpaWQiOjQzOTk0OTE2LCJvaWQiOjI2NzA3NCwicyI6NTEwLCJzaWQiOiI5MWUxNGY0Zi05MTNmLTQzYTktOTNjZC03NjZkOTQwYTRlZTAiLCJ1aWQiOjQzOTk0OTE2fQ.Iyxn2RIAywWodXEtLbcKfXolSS-1u5KSTTeNG7PnMybyy6UHCJDlQDVkztct-hG4B7QG29sUjNJnqp1Oa7PRAw'
     }
 ]
 
 
 def raise_if_api_err(api_result):
+    if 'is_error' in api_result:
+        raise Exception(f'{api_result["status_code"]}:{api_result["reason"]}')
     if 'code' in api_result and api_result['code'] >= 400:
         raise Exception(api_result["message"])
 
@@ -108,7 +125,7 @@ def send_telegram_message(text_message):
 
     rq.request(
         method='GET',
-        url=f'https://api.telegram.org/bot{tg_token}/sendMessage?chat_id={chat_id}&parse_mode=html&text={message}'
+        url=f'https://api.telegram.org/bot{tg_token}/sendMessage?chat_id={chat_id}&text={message}'
     )
 
 
@@ -129,14 +146,19 @@ def get_dates_range():
 
 
 def run_request(method, url, params, authToken):
-    return rq.request(
+    request_result = rq.request(
         method=method,
         url=f'{BASE_URL}{url}',
         params=params,
         headers={
             'Authorization': f'Bearer {authToken}'
         }
-    ).json()
+    )
+
+    try:
+        return request_result.json()
+    except:
+        return {'is_error': True, 'reason': request_result.reason, 'status_code': request_result.status_code}
 
 
 def key_alias(base_dict, alias):
@@ -147,82 +169,87 @@ def key_alias(base_dict, alias):
     return result
 
 
-start_time = time.time()
-dates_range = get_dates_range()
-results = {}
+if __name__ == '__main__':
+    start_time = time.time()
+    dates_range = get_dates_range()
 
-send_telegram_message(f'********* ********* \nstart new process for dates {START_DATE} - {END_DATE}')
+    send_telegram_message(f'********* ********* \nSTART NEW PROCESS for dates {START_DATE} - {END_DATE}')
 
-for company in COMPANIES:
-    rows = []
+    for d_range in dates_range:
+        results = {}
 
-    try:
-        send_telegram_message(f'company start 🚀: {company["name"]}')
-        upd = run_request('GET', 'upd', {'from': START_DATE, 'to': END_DATE}, company['authToken'])
-        raise_if_api_err(upd)
+        for company in COMPANIES:
+            rows = []
 
-        grouped_upd_by_id = {}
-        for upd_i in upd:
-            if upd_i['advertId'] in grouped_upd_by_id:
-                grouped_upd_by_id[upd_i['advertId']]['updSum'] += upd_i['updSum']
+            try:
+                send_telegram_message(f'company start 🚀: {company["name"]} date: {d_range["startApi"]}')
+                upd = run_request('GET', 'upd', {'from': d_range['startApi'], 'to': d_range['endApi']},
+                                  company['authToken'])
+                raise_if_api_err(upd)
+
+                grouped_upd_by_id = {}
+                for upd_i in upd:
+                    if upd_i['advertId'] in grouped_upd_by_id:
+                        grouped_upd_by_id[upd_i['advertId']]['updSum'] += upd_i['updSum']
+                        continue
+
+                    grouped_upd_by_id[upd_i['advertId']] = upd_i
+
+                upd_items = list(grouped_upd_by_id.values())
+                upd_item_idx = 0
+                while len(upd_items) > upd_item_idx:
+                    upd_item = upd_items[upd_item_idx]
+
+                    print(f'upd: {upd_item_idx + 1} of {len(upd)}')
+                    data = run_request(
+                        'GET',
+                        'fullstat',
+                        {
+                            'id': upd_item['advertId'],
+                            'begin': d_range['startApi'],
+                            'end': d_range['endApi']
+                        },
+                        company['authToken']
+                    )
+
+                    if 'code' in data and data['code'] == 429 or 'is_error' in data:
+                        seconds_to_sleep = 10
+                        print(f'{data["message"]}, sleep {seconds_to_sleep}s')
+                        time.sleep(seconds_to_sleep)
+                        continue
+
+                    # raise_if_api_err(data)
+
+                    if 'days' in data and data['days'] is not None:
+                        for day in data['days']:
+                            for app in day['apps']:
+                                for nm in app['nm']:
+                                    row = {
+                                        'companyName': company['name'],
+                                        'date': d_range['startApi'],
+                                        **key_alias(upd_item, 'upd'),
+                                        **key_alias(nm, 'day.apps.nm'),
+                                        **key_alias(app, 'day.apps'),
+                                        **key_alias(day, 'day'),
+                                        **key_alias(data, 'main'),
+                                    }
+                                    rows.append(row)
+
+                    upd_item_idx += 1
+            except Exception as err:
+                send_telegram_message(f'company ❌ ERR: {company["name"]}, date: {d_range["startApi"]}, {err}')
+                send_telegram_message(traceback.format_exc())
+                rows = []
                 continue
 
-            grouped_upd_by_id[upd_i['advertId']] = upd_i
+            results[company['name']] = rows
+            send_telegram_message(f'data success received  ✅: {company["name"]}, date: {d_range["startApi"]}')
 
-        for upd_item_idx, advertId in enumerate(grouped_upd_by_id):
-            upd_item = grouped_upd_by_id[advertId]
-            range_idx = 0
-            while len(dates_range) > range_idx:
-                print(f'upd: {upd_item_idx + 1} of {len(upd)}; riupd: {range_idx + 1} of {len(dates_range)}')
-                d_range = dates_range[range_idx]
-                data = run_request(
-                    'GET',
-                    'fullstat',
-                    {
-                        'id': upd_item['advertId'],
-                        'begin': d_range['startApi'],
-                        'end': d_range['endApi']
-                    },
-                    company['authToken']
-                )
+        for company_name in results:
+            company_rows = results[company_name]
+            save_rows_to_retrafic(company_rows)
+            send_telegram_message(f'saved data for {company_name}, total: {len(company_rows)} rows')
 
-                if 'code' in data and data['code'] == 429:
-                    seconds_to_sleep = 10
-                    print(f'{data["message"]}, sleep {seconds_to_sleep}s')
-                    time.sleep(seconds_to_sleep)
-                    continue
-
-                raise_if_api_err(data)
-
-                if 'days' in data and data['days'] is not None:
-                    for day in data['days']:
-                        for app in day['apps']:
-                            for nm in app['nm']:
-                                row = {
-                                    'companyName': company['name'],
-                                    'date': d_range['startApi'],
-                                    **key_alias(upd_item, 'upd'),
-                                    **key_alias(nm, 'day.apps.nm'),
-                                    **key_alias(app, 'day.apps'),
-                                    **key_alias(day, 'day'),
-                                    **key_alias(data, 'main'),
-                                }
-                                rows.append(row)
-
-                range_idx += 1
-    except Exception as err:
-        send_telegram_message(f'company ❌ ERR: {company["name"]}, {err}')
-        rows = []
-        continue
-
-    results[company['name']] = rows
-    send_telegram_message(f'data success received  ✅: {company["name"]}')
-
-for company_name in results:
-    company_rows = results[company_name]
-    save_rows_to_retrafic(company_rows)
-    send_telegram_message(f'saved data for {company_name}, total: {len(company_rows)} rows')
-
-total_seconds_formatted = "{:10.2f}".format(time.time() - start_time)
-send_telegram_message(f'end, total rows man {len(results)}, \nruntime: {total_seconds_formatted} sec.')
-
+    total_seconds_formatted = "{:10.2f}".format(time.time() - start_time)
+    send_telegram_message(
+        f'END PROCESS, date ranges total: {len(dates_range)} \nruntime: {total_seconds_formatted} sec.')

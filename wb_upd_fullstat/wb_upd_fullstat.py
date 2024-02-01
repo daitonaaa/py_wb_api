@@ -6,7 +6,6 @@ from urllib.parse import quote
 import datetime
 import traceback
 
-
 DATE_STR_FORMAT = '%Y-%m-%d'
 
 prev_day = datetime.datetime.now() - Day(1)
@@ -214,7 +213,7 @@ if __name__ == '__main__':
 
                     if 'code' in data and data['code'] == 429 or 'is_error' in data:
                         seconds_to_sleep = 10
-                        print(f'{data["message"]}, sleep {seconds_to_sleep}s')
+                        print(f'sleep {seconds_to_sleep}s')
                         time.sleep(seconds_to_sleep)
                         continue
 

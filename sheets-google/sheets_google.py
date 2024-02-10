@@ -44,6 +44,7 @@ if __name__ == '__main__':
 
     try:
         with engine.connect() as connection:
+            send_telegram_message('step 1')
             query = text(f'''
 
     select
@@ -138,23 +139,238 @@ if __name__ == '__main__':
 
             result_1 = connection.execute(query)
 
-    finally:
+            stock_df = pd.DataFrame(result_1.fetchall(), columns=result_1.keys())
 
+            gc = gspread.service_account_from_dict(sh_auth_dict)
+            sh = gc.open_by_key('1vdoXY88jnSHdP3HJ-5EXsTlJLdv4HjYFuuYV1ouIM3w')
+
+            worksheet = sh.worksheet('warehouses')
+            sh.values_clear("warehouses!C1:H1000000")
+            gd.set_with_dataframe(worksheet, stock_df, 1, 3)
+
+            ## step 2
+            send_telegram_message('step 2')
+
+            query = text(f'''
+
+               SELECT
+               globality.*
+               ,ifnull(case when conversion.conv_ord_1 = 0 then conversion.conv_ord_2 else conversion.conv_ord_1 end,0.5) as conv_ord
+               ,ifnull(case when conversion.ret_share_1 = 0 then conversion.ret_share_2 else conversion.ret_share_1 end,0.05) as ret_share
+               ,seb_3.sebest as cogs_amount
+
+               from
+
+               (
+               SELECT
+               DATE_FORMAT(ipm_orders.`date`,'%Y-%m-%d') as date_ord
+               ,ipm_orders.supplierArticle
+               ,ipm_orders.nmId
+               ,ifnull(round(sum(t5.avg_cost)/count(ipm_orders.priceWithDisc),0),0) as unit_logistics
+               ,round(count(ipm_orders.priceWithDisc),2) as order_count
+               ,round(sum(ipm_orders.priceWithDisc),2) as order_amount
+               from user205.orders_all as ipm_orders
+               left join user205.table_5 as t5 on t5.sa_name = ipm_orders.supplierArticle
+               and t5.office_name = ipm_orders.warehouseName
+               where ipm_orders.`date` > '{formatted_date}'
+               group by 1,2
+               order by 1 desc
+               ) as globality
+               left join (
+               SELECT
+
+               sa_name
+               ,IFNULL(sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt > '2023-12-01' then 1 else 0 end)/
+               (sum(case when bonus_type_name = 'К клиенту при отмене'
+               and sale_dt > '2023-12-01' then 1 else 0 end)
+               + sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt > '2023-12-01' then 1 else 0 end)),0) as conv_ord_1
+
+               ,IFNULL(sum(case when bonus_type_name = 'От клиента при возврате'
+               and sale_dt > '2023-12-01' then 1 else 0 end)/
+               (sum(case when bonus_type_name = 'К клиенту при отмене'
+               and sale_dt > '2023-12-01' then 1 else 0 end)
+               + sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt > '2023-12-01' then 1 else 0 end)),0) as ret_share_1
+
+               ,IFNULL(sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)/
+               (sum(case when bonus_type_name = 'К клиенту при отмене'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)
+               + sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)),0.5) as conv_ord_2
+
+               ,IFNULL(sum(case when bonus_type_name = 'От клиента при возврате'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)/
+               (sum(case when bonus_type_name = 'К клиенту при отмене'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)
+               + sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)),0.05) as ret_share_2
+               from user205.weekly_all
+               group by 1 )
+               as conversion
+               on conversion.sa_name = globality.supplierArticle
+
+
+
+               left JOIN (
+               SELECT
+               seb.art
+               ,seb.sebest
+               from user205.sebest as seb
+               inner join
+               (
+               SELECT
+               max(seb_1.date_start) as date_start
+               from user205.sebest as seb_1
+               ) as seb_2
+               on seb.date_start = seb_2.date_start
+
+               )
+               as seb_3
+               on seb_3.art = globality.supplierArticle
+
+
+               union
+
+
+               SELECT
+
+
+               qwerty.date_ord
+               ,qwerty.group_art as 'supplierArticle'
+               ,"total"
+               ,round(sum(qwerty.agg_logistics)/SUM(qwerty.order_count),2) as 'unit_logistics'
+               ,SUM(qwerty.order_count) as 'order_count'
+               ,round(sum(qwerty.order_amount),2) as 'order_amount'
+               ,round(sum(qwerty.agg_purchased)/SUM(qwerty.order_count),4) as 'conv_ord'
+               ,round(sum(qwerty.agg_returned)/SUM(qwerty.order_count),4) as 'ret_share'
+               ,round(sum(qwerty.agg_cogs)/sum(qwerty.order_count),2) as 'cogs_amount'
+
+
+               from (
+
+               SELECT
+
+               m.group_art
+               ,globality.*
+
+               ,ifnull(case when conversion.conv_ord_1 = 0 then conversion.conv_ord_2 else conversion.conv_ord_1 end,0.5) as conv_ord
+               ,ifnull(case when conversion.ret_share_1 = 0 then conversion.ret_share_2 else conversion.ret_share_1 end,0.05) as ret_share
+               ,seb_3.sebest as cogs_amount
+               ,globality.order_count*globality.unit_logistics as agg_logistics
+               ,round(globality.order_count*ifnull(case when conversion.conv_ord_1 = 0 then conversion.conv_ord_2 else conversion.conv_ord_1 end,0.5),2) as agg_purchased
+               ,round(globality.order_count*ifnull(case when conversion.ret_share_1 = 0 then conversion.ret_share_2 else conversion.ret_share_1 end,0.05),2) as agg_returned
+               ,round(globality.order_count*seb_3.sebest,2) as agg_cogs
+
+
+
+               from
+
+               (
+               SELECT
+               DATE_FORMAT(ipm_orders.`date`,'%Y-%m-%d') as date_ord
+               ,ipm_orders.supplierArticle
+               ,ipm_orders.nmId
+
+               ,ifnull(round(sum(t5.avg_cost)/count(ipm_orders.priceWithDisc),0),0) as unit_logistics
+
+               ,round(count(ipm_orders.priceWithDisc),2) as order_count
+               ,round(sum(ipm_orders.priceWithDisc),2) as order_amount
+               from user205.orders_all as ipm_orders
+               left join user205.table_5 as t5 on t5.sa_name = ipm_orders.supplierArticle
+               and t5.office_name = ipm_orders.warehouseName
+               where ipm_orders.`date` > '{formatted_date}'
+
+               group by 1,2
+               order by 1 desc
+               ) as globality
+               left join (
+               SELECT
+
+               sa_name
+               ,IFNULL(sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt > '2023-12-01' then 1 else 0 end)/
+               (sum(case when bonus_type_name = 'К клиенту при отмене'
+               and sale_dt > '2023-12-01' then 1 else 0 end)
+               + sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt > '2023-12-01' then 1 else 0 end)),0) as conv_ord_1
+
+               ,IFNULL(sum(case when bonus_type_name = 'От клиента при возврате'
+               and sale_dt > '2023-12-01' then 1 else 0 end)/
+               (sum(case when bonus_type_name = 'К клиенту при отмене'
+               and sale_dt > '2023-12-01' then 1 else 0 end)
+               + sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt > '2023-12-01' then 1 else 0 end)),0) as ret_share_1
+
+               ,IFNULL(sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)/
+               (sum(case when bonus_type_name = 'К клиенту при отмене'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)
+               + sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)),0.5) as conv_ord_2
+
+               ,IFNULL(sum(case when bonus_type_name = 'От клиента при возврате'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)/
+               (sum(case when bonus_type_name = 'К клиенту при отмене'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)
+               + sum(case when bonus_type_name = 'К клиенту при продаже'
+               and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)),0.05) as ret_share_2
+               from user205.weekly_all
+               group by 1 )
+               as conversion
+               on conversion.sa_name = globality.supplierArticle
+
+
+
+               left JOIN (
+               SELECT
+               seb.art
+               ,seb.sebest
+               from user205.sebest as seb
+               inner join
+               (
+               SELECT
+               max(seb_1.date_start) as date_start
+               from user205.sebest as seb_1
+               ) as seb_2
+               on seb.date_start = seb_2.date_start
+
+               )
+               as seb_3
+               on seb_3.art = globality.supplierArticle
+
+               left JOIN mapping m on m.supplierArticle = globality.supplierArticle
+               ) as qwerty
+
+
+               group by 1,2,3
+               order by 1 desc
+
+
+
+                                    ''')
+            result_2 = connection.execute(query)
+
+            orders_df = pd.DataFrame(result_2.fetchall(), columns=result_2.keys())
+            orders_df['conv_ord'] = orders_df['conv_ord'].astype(float)
+            orders_df['ret_share'] = orders_df['ret_share'].astype(float)
+
+            gc = gspread.service_account_from_dict(sh_auth_dict)
+            sh = gc.open_by_key('1vdoXY88jnSHdP3HJ-5EXsTlJLdv4HjYFuuYV1ouIM3w')
+
+            worksheet = sh.worksheet('data')
+            sh.values_clear("data!B1:J100000")
+            gd.set_with_dataframe(worksheet, orders_df, 1, 2)
+
+    finally:
         engine.dispose()
 
-    stock_df = pd.DataFrame(result_1.fetchall(), columns=result_1.keys())
 
-    gc = gspread.service_account_from_dict(sh_auth_dict)
-    sh = gc.open_by_key('1vdoXY88jnSHdP3HJ-5EXsTlJLdv4HjYFuuYV1ouIM3w')
 
-    worksheet = sh.worksheet('warehouses')
-    sh.values_clear("warehouses!C1:H1000000")
-    gd.set_with_dataframe(worksheet, stock_df, 1, 3)
-
-    # In[3]:
-
-    ### ВОТ ЭТО 3/4
-
+    # step 3
+    send_telegram_message('step 3')
     engine = create_engine('mysql+mysqlconnector://user344:979ce803d58bdd90f13826bb155fda57@db.retrafic.ru/user344')
 
     try:
@@ -200,230 +416,5 @@ if __name__ == '__main__':
     sh.values_clear("advert!a1:n100000")
     gd.set_with_dataframe(worksheet, advert_df, 1, 1)
 
-    # In[ ]:
 
-    ### ВОТ ЭТО 4/4
-
-    engine_2 = create_engine('mysql+mysqlconnector://user205:b627e57c1b3bcfb7e4eb15be5be19019@db.retrafic.ru/user205')
-
-    try:
-        with engine_2.connect() as connection:
-            query = text(f'''
-
-    SELECT
-    globality.*
-    ,ifnull(case when conversion.conv_ord_1 = 0 then conversion.conv_ord_2 else conversion.conv_ord_1 end,0.5) as conv_ord
-    ,ifnull(case when conversion.ret_share_1 = 0 then conversion.ret_share_2 else conversion.ret_share_1 end,0.05) as ret_share
-    ,seb_3.sebest as cogs_amount
-
-    from
-
-    (
-    SELECT
-    DATE_FORMAT(ipm_orders.`date`,'%Y-%m-%d') as date_ord
-    ,ipm_orders.supplierArticle
-    ,ipm_orders.nmId
-    ,ifnull(round(sum(t5.avg_cost)/count(ipm_orders.priceWithDisc),0),0) as unit_logistics
-    ,round(count(ipm_orders.priceWithDisc),2) as order_count
-    ,round(sum(ipm_orders.priceWithDisc),2) as order_amount
-    from user205.orders_all as ipm_orders
-    left join user205.table_5 as t5 on t5.sa_name = ipm_orders.supplierArticle
-    and t5.office_name = ipm_orders.warehouseName
-    where ipm_orders.`date` > '{formatted_date}'
-    group by 1,2
-    order by 1 desc
-    ) as globality
-    left join (
-    SELECT
-
-    sa_name
-    ,IFNULL(sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt > '2023-12-01' then 1 else 0 end)/
-    (sum(case when bonus_type_name = 'К клиенту при отмене'
-    and sale_dt > '2023-12-01' then 1 else 0 end)
-    + sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt > '2023-12-01' then 1 else 0 end)),0) as conv_ord_1
-
-    ,IFNULL(sum(case when bonus_type_name = 'От клиента при возврате'
-    and sale_dt > '2023-12-01' then 1 else 0 end)/
-    (sum(case when bonus_type_name = 'К клиенту при отмене'
-    and sale_dt > '2023-12-01' then 1 else 0 end)
-    + sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt > '2023-12-01' then 1 else 0 end)),0) as ret_share_1
-
-    ,IFNULL(sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)/
-    (sum(case when bonus_type_name = 'К клиенту при отмене'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)
-    + sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)),0.5) as conv_ord_2
-
-    ,IFNULL(sum(case when bonus_type_name = 'От клиента при возврате'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)/
-    (sum(case when bonus_type_name = 'К клиенту при отмене'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)
-    + sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)),0.05) as ret_share_2
-    from user205.weekly_all
-    group by 1 )
-    as conversion
-    on conversion.sa_name = globality.supplierArticle
-
-
-
-    left JOIN (
-    SELECT
-    seb.art
-    ,seb.sebest
-    from user205.sebest as seb
-    inner join
-    (
-    SELECT
-    max(seb_1.date_start) as date_start
-    from user205.sebest as seb_1
-    ) as seb_2
-    on seb.date_start = seb_2.date_start
-
-    )
-    as seb_3
-    on seb_3.art = globality.supplierArticle
-
-
-    union
-
-
-    SELECT
-
-
-    qwerty.date_ord
-    ,qwerty.group_art as 'supplierArticle'
-    ,"total"
-    ,round(sum(qwerty.agg_logistics)/SUM(qwerty.order_count),2) as 'unit_logistics'
-    ,SUM(qwerty.order_count) as 'order_count'
-    ,round(sum(qwerty.order_amount),2) as 'order_amount'
-    ,round(sum(qwerty.agg_purchased)/SUM(qwerty.order_count),4) as 'conv_ord'
-    ,round(sum(qwerty.agg_returned)/SUM(qwerty.order_count),4) as 'ret_share'
-    ,round(sum(qwerty.agg_cogs)/sum(qwerty.order_count),2) as 'cogs_amount'
-
-
-    from (
-
-    SELECT
-
-    m.group_art
-    ,globality.*
-
-    ,ifnull(case when conversion.conv_ord_1 = 0 then conversion.conv_ord_2 else conversion.conv_ord_1 end,0.5) as conv_ord
-    ,ifnull(case when conversion.ret_share_1 = 0 then conversion.ret_share_2 else conversion.ret_share_1 end,0.05) as ret_share
-    ,seb_3.sebest as cogs_amount
-    ,globality.order_count*globality.unit_logistics as agg_logistics
-    ,round(globality.order_count*ifnull(case when conversion.conv_ord_1 = 0 then conversion.conv_ord_2 else conversion.conv_ord_1 end,0.5),2) as agg_purchased
-    ,round(globality.order_count*ifnull(case when conversion.ret_share_1 = 0 then conversion.ret_share_2 else conversion.ret_share_1 end,0.05),2) as agg_returned
-    ,round(globality.order_count*seb_3.sebest,2) as agg_cogs
-
-
-
-    from
-
-    (
-    SELECT
-    DATE_FORMAT(ipm_orders.`date`,'%Y-%m-%d') as date_ord
-    ,ipm_orders.supplierArticle
-    ,ipm_orders.nmId
-
-    ,ifnull(round(sum(t5.avg_cost)/count(ipm_orders.priceWithDisc),0),0) as unit_logistics
-
-    ,round(count(ipm_orders.priceWithDisc),2) as order_count
-    ,round(sum(ipm_orders.priceWithDisc),2) as order_amount
-    from user205.orders_all as ipm_orders
-    left join user205.table_5 as t5 on t5.sa_name = ipm_orders.supplierArticle
-    and t5.office_name = ipm_orders.warehouseName
-    where ipm_orders.`date` > '{formatted_date}'
-
-    group by 1,2
-    order by 1 desc
-    ) as globality
-    left join (
-    SELECT
-
-    sa_name
-    ,IFNULL(sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt > '2023-12-01' then 1 else 0 end)/
-    (sum(case when bonus_type_name = 'К клиенту при отмене'
-    and sale_dt > '2023-12-01' then 1 else 0 end)
-    + sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt > '2023-12-01' then 1 else 0 end)),0) as conv_ord_1
-
-    ,IFNULL(sum(case when bonus_type_name = 'От клиента при возврате'
-    and sale_dt > '2023-12-01' then 1 else 0 end)/
-    (sum(case when bonus_type_name = 'К клиенту при отмене'
-    and sale_dt > '2023-12-01' then 1 else 0 end)
-    + sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt > '2023-12-01' then 1 else 0 end)),0) as ret_share_1
-
-    ,IFNULL(sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)/
-    (sum(case when bonus_type_name = 'К клиенту при отмене'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)
-    + sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)),0.5) as conv_ord_2
-
-    ,IFNULL(sum(case when bonus_type_name = 'От клиента при возврате'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)/
-    (sum(case when bonus_type_name = 'К клиенту при отмене'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)
-    + sum(case when bonus_type_name = 'К клиенту при продаже'
-    and sale_dt BETWEEN '2023-11-01' and '2023-11-30' then 1 else 0 end)),0.05) as ret_share_2
-    from user205.weekly_all
-    group by 1 )
-    as conversion
-    on conversion.sa_name = globality.supplierArticle
-
-
-
-    left JOIN (
-    SELECT
-    seb.art
-    ,seb.sebest
-    from user205.sebest as seb
-    inner join
-    (
-    SELECT
-    max(seb_1.date_start) as date_start
-    from user205.sebest as seb_1
-    ) as seb_2
-    on seb.date_start = seb_2.date_start
-
-    )
-    as seb_3
-    on seb_3.art = globality.supplierArticle
-
-    left JOIN mapping m on m.supplierArticle = globality.supplierArticle
-    ) as qwerty
-
-
-    group by 1,2,3
-    order by 1 desc
-
-
-
-                         ''')
-            result_2 = connection.execute(query)
-
-    finally:
-        # Close the connection
-        engine_2.dispose()
-
-    orders_df = pd.DataFrame(result_2.fetchall(), columns=result_2.keys())
-    orders_df['conv_ord'] = orders_df['conv_ord'].astype(float)
-    orders_df['ret_share'] = orders_df['ret_share'].astype(float)
-
-    print(orders_df)
-
-    gc = gspread.service_account_from_dict(sh_auth_dict)
-    sh = gc.open_by_key('1vdoXY88jnSHdP3HJ-5EXsTlJLdv4HjYFuuYV1ouIM3w')
-
-    worksheet = sh.worksheet('data')
-    sh.values_clear("data!B1:J100000")
-    gd.set_with_dataframe(worksheet, orders_df, 1, 2)
     send_telegram_message('end')

@@ -372,7 +372,7 @@ if __name__ == '__main__':
 
     # step 3
     send_telegram_message('step 3')
-    engine = create_engine('mysql+mysqlconnector://user344:979ce803d58bdd90f13826bb155fda57@db.retrafic.ru/user344')
+    engine = create_engine('mysql+mysqlconnector://user344:1d9dce46940f625466943eacc499718f@db.retrafic.ru/user344')
 
     try:
         with engine.connect() as connection:

@@ -55,8 +55,9 @@ COMPANIES = [
 db_connection = mysql.connector.connect(
     host="db.retrafic.ru",
     user="user344",
-    password="979ce803d58bdd90f13826bb155fda57",
-    database="user344"
+    password="1d9dce46940f625466943eacc499718f",
+    database="user344",
+    port=3306
 )
 
 cursor = db_connection.cursor()

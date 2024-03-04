@@ -52,7 +52,6 @@ if __name__ == '__main__':
     qwerty_2.seller
     ,dated_list
     ,qwerty_2.supplierArticle
-    #,qwerty_2.techSize
     ,qwerty_2.warehouseName
     ,sum(skl_1.quantity) as quantity
 
@@ -100,7 +99,7 @@ if __name__ == '__main__':
         from user205.warehouses_all
         where quantity != 0
         #and supplierArticle = '0130black'
-        and warehouseName not in ('Санкт-Петербург','Екатеринбург','Подольск 3','Екатеринбург 2')
+        and warehouseName not in ('Санкт-Петербург','Екатеринбург','Подольск 3','Екатеринбург 2','Санкт-Петербург Шушары')
         group by 1,2,3,4,5
         ) as skl on d.dated_list >= skl.last_date
 
@@ -113,7 +112,8 @@ if __name__ == '__main__':
         left join
         (
         select
-        supplierArticle
+        seller
+        ,supplierArticle
         ,techSize
         ,warehouseName
         ,DATE_FORMAT(lastChangeDate,'%Y-%m-%d') as last_date
@@ -121,14 +121,15 @@ if __name__ == '__main__':
         from user205.warehouses_all
 
         where quantity > 1
-        and warehouseName not in ('Санкт-Петербург','Екатеринбург','Подольск 3','Екатеринбург 2')
-        group by 1,2,3,4
+        and warehouseName not in ('Санкт-Петербург','Екатеринбург','Подольск 3','Екатеринбург 2','Санкт-Петербург Шушары')
+        group by 1,2,3,4,5
         ) as skl_1
 
     on skl_1.supplierArticle = qwerty_2.supplierArticle
     and skl_1.techSize = qwerty_2.techSize
     and skl_1.warehouseName = qwerty_2.warehouseName
     and skl_1.last_date = qwerty_2.last_date
+    and skl_1.seller = qwerty_2.seller
 
     where qwerty_2.dated_list >= '{formatted_date}'
     and skl_1.quantity is not null
@@ -418,3 +419,4 @@ if __name__ == '__main__':
 
 
     send_telegram_message('end')
+

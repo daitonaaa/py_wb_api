@@ -9,7 +9,7 @@ import requests as rq
 def send_telegram_message(text_message):
     chat_id = -4020643298
     tg_token = '6236028980:AAHSNJaZQ3wFmtiviAvK26ABycfpG9vQz40'
-    message = quote(f'Unit_economics: {text_message}')
+    message = quote(f'Unit_economics 📊📊📊: {text_message}')
 
     rq.request(
         method='GET',

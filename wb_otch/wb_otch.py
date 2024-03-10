@@ -11,7 +11,7 @@ RETRAEFIC_WEBHOOK_SAVE = 'https://retrafic.ru/api/integrations/save/df50bd45966c
 def send_telegram_message(text_message):
     chat_id = -4020643298
     tg_token = '6236028980:AAHSNJaZQ3wFmtiviAvK26ABycfpG9vQz40'
-    message = quote(f'weekly_finance: {text_message}')
+    message = quote(f'weekly_finance ⏰⏰⏰: {text_message}')
 
     rq.request(
         method='GET',

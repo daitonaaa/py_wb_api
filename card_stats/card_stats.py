@@ -154,7 +154,7 @@ def get_dates_range():
 def send_telegram_message(text_message):
     chat_id = -4020643298
     tg_token = '6236028980:AAHSNJaZQ3wFmtiviAvK26ABycfpG9vQz40'
-    message = quote(f'card_stats: {text_message}')
+    message = quote(f'card_stats 🔥🔥🔥: {text_message}')
 
     requests.request(
         method='GET',

@@ -24,6 +24,8 @@ if __name__ == '__main__':
                 db.save_row('ozon_warehouse', row_to_db_save)
 
             tg.send_message(f'data from company: {company_name} saved')
+
+        tg.send_message('end')
     except:
         tg.error_traceback()
     finally:

@@ -9,8 +9,8 @@ CATEGORY_URLS = [
     '/catalog/zootovary/dlya-loshadey',
     '/promotions/klientskie-dni/dlya-doma/predmety-interera/dekorativnye-nakleyki'
 ]
-START_DATE = '2023-08-25'
-END_DATE = '2023-08-31'
+START_DATE = '2024-03-20'
+END_DATE = '2024-03-20'
 
 # FREQ = 'm'
 # FREQ = 'w'

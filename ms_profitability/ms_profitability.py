@@ -1,5 +1,5 @@
 from bronkscommon import MskladGateway, ms_api_base_creds, Telegram, prepare_row_to_save, MysqlDatabaseConnect, \
-    key_alias, user205mysqldb_creds, compose, format_num
+    key_alias, user205mysqldb_creds, compose, format_num, to_rub
 from pandas.tseries.offsets import Hour, Minute, Second, Day
 import pandas as pd
 import datetime
@@ -15,12 +15,6 @@ previous_end_of_week = previous_monday + Day(6)
 
 date_start_str = previous_monday.strftime(date_str_format_short)
 date_end_str = previous_end_of_week.strftime(date_str_format_short)
-
-
-def to_rub(raw):
-    if raw:
-        return raw / 100
-    return raw
 
 
 def get_dates_range():

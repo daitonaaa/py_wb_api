@@ -100,6 +100,7 @@ if __name__ == '__main__':
         where quantity != 0
         #and supplierArticle = '0130black'
         and warehouseName not in ('Санкт-Петербург','Екатеринбург','Подольск 3','Екатеринбург 2','Санкт-Петербург Шушары')
+	and SCCode = 'Tech'
         group by 1,2,3,4,5
         ) as skl on d.dated_list >= skl.last_date
 
@@ -122,6 +123,7 @@ if __name__ == '__main__':
 
         where quantity > 1
         and warehouseName not in ('Санкт-Петербург','Екатеринбург','Подольск 3','Екатеринбург 2','Санкт-Петербург Шушары')
+	and SCCode = 'Tech'	
         group by 1,2,3,4,5
         ) as skl_1
 
@@ -213,13 +215,16 @@ if __name__ == '__main__':
                as conversion
                on conversion.sa_name = globality.supplierArticle
 
-
-
                left JOIN (
                SELECT
-               seb.art
+               m.sku
+               #seb.art
                ,seb.sebest
                from user205.sebest as seb
+
+               left join user205.mapping_new as m
+               on seb.art = m.sku_cogs
+
                inner join
                (
                SELECT
@@ -230,8 +235,9 @@ if __name__ == '__main__':
 
                )
                as seb_3
-               on seb_3.art = globality.supplierArticle
+	       on seb_3.sku = globality.supplierArticle 			
 
+####
 
                union
 
@@ -327,9 +333,14 @@ if __name__ == '__main__':
 
                left JOIN (
                SELECT
-               seb.art
+               m.sku
+               #seb.art
                ,seb.sebest
                from user205.sebest as seb
+
+               left join user205.mapping_new as m
+               on seb.art = m.sku_cogs
+
                inner join
                (
                SELECT
@@ -340,7 +351,7 @@ if __name__ == '__main__':
 
                )
                as seb_3
-               on seb_3.art = globality.supplierArticle
+	       on seb_3.sku = globality.supplierArticle 
 
                left JOIN mapping m on m.supplierArticle = globality.supplierArticle
                ) as qwerty

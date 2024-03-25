@@ -145,6 +145,24 @@ class MskladGateway:
 
         return results
 
+    def get_all_demand_by_store(self, ms_store_link, date_from, date_to):
+        results = []
+        params = {
+            'filter': f'updated>={date_from};updated<={date_to};store={ms_store_link}',
+            'limit': 1000,
+        }
+
+        first_call = self.__request('GET', 'api/remap/1.2/entity/demand', None, params)
+        results.extend(first_call['rows'])
+
+        while first_call['meta']['size'] > len(results):
+            second_call = self.__request(
+                'GET', 'api/remap/1.2/entity/demand', None, {**params, 'offset': len(results)}
+            )
+            results.extend(second_call['rows'])
+
+        return results
+
 
 user344mysqldb_creds = {
     'host': 'db.retrafic.ru',
@@ -284,3 +302,9 @@ def compose(fn_array):
         return current_val
 
     return fn
+
+
+def to_rub(raw):
+    if raw:
+        return raw / 100
+    return raw
